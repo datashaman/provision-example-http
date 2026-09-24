@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 )
 
 func TestHealthAndRevisionEndpoints(t *testing.T) {
@@ -33,5 +34,43 @@ func TestHealthAndRevisionEndpoints(t *testing.T) {
 	}
 	if response.StatusCode != http.StatusOK || string(body) != "{\"revision\":\"example-v1\"}\n" {
 		t.Fatalf("verification response = %d %q", response.StatusCode, body)
+	}
+}
+
+func TestSlowEndpointReportsTheRevisionThatAcceptedTheRequest(t *testing.T) {
+	server := httptest.NewServer(handler("example-v2"))
+	t.Cleanup(server.Close)
+
+	started := time.Now()
+	response, err := http.Get(server.URL + "/slow?seconds=1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer response.Body.Close()
+	body, err := io.ReadAll(response.Body)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if elapsed := time.Since(started); elapsed < time.Second {
+		t.Fatalf("slow response returned after %s; want at least 1s", elapsed)
+	}
+	if response.StatusCode != http.StatusOK || string(body) != "{\"revision\":\"example-v2\"}\n" {
+		t.Fatalf("slow response = %d %q", response.StatusCode, body)
+	}
+}
+
+func TestSlowEndpointRejectsInvalidDurations(t *testing.T) {
+	server := httptest.NewServer(handler("example-v2"))
+	t.Cleanup(server.Close)
+
+	for _, query := range []string{"", "0", "31", "nope"} {
+		response, err := http.Get(server.URL + "/slow?seconds=" + query)
+		if err != nil {
+			t.Fatal(err)
+		}
+		response.Body.Close()
+		if response.StatusCode != http.StatusBadRequest {
+			t.Fatalf("seconds=%q status = %d; want 400", query, response.StatusCode)
+		}
 	}
 }

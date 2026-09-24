@@ -7,6 +7,7 @@ The application exposes:
 - `GET /live` — process liveness;
 - `GET /ready` — traffic readiness;
 - `GET /verify` — the value of `PROVISION_REVISION` as JSON;
+- `GET /slow?seconds=N` — a bounded delayed response that identifies the revision which accepted it, for graceful-switch acceptance tests;
 - `GET /` — a plain-text identification response.
 
 It listens on `PROVISION_HTTP_LISTEN`, defaulting to `127.0.0.1:18081`. Build a reproducible native Linux bundle with:

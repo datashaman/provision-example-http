@@ -5,6 +5,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"strconv"
 	"time"
 )
 
@@ -37,6 +38,22 @@ func handler(revision string) http.Handler {
 	mux.HandleFunc("GET /verify", func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		_ = json.NewEncoder(w).Encode(map[string]string{"revision": revision})
+	})
+	mux.HandleFunc("GET /slow", func(w http.ResponseWriter, r *http.Request) {
+		delay, err := strconv.Atoi(r.URL.Query().Get("seconds"))
+		if err != nil || delay < 1 || delay > 30 {
+			http.Error(w, "seconds must be an integer from 1 to 30", http.StatusBadRequest)
+			return
+		}
+		timer := time.NewTimer(time.Duration(delay) * time.Second)
+		defer timer.Stop()
+		select {
+		case <-timer.C:
+			w.Header().Set("Content-Type", "application/json")
+			_ = json.NewEncoder(w).Encode(map[string]string{"revision": revision})
+		case <-r.Context().Done():
+			return
+		}
 	})
 	mux.HandleFunc("GET /", func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
