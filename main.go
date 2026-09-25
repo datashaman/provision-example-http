@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"os"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -20,22 +21,31 @@ func main() {
 	}
 	server := &http.Server{
 		Addr:              address,
-		Handler:           handler(revision),
+		Handler:           handler(revision, address),
 		ReadHeaderTimeout: 5 * time.Second,
 	}
 	log.Printf("Provision HTTP example listening on %s as revision %s", address, revision)
 	log.Fatal(server.ListenAndServe())
 }
 
-func handler(revision string) http.Handler {
+func handler(revision, directHost string) http.Handler {
 	mux := http.NewServeMux()
-	mux.HandleFunc("GET /live", func(w http.ResponseWriter, _ *http.Request) {
+	mux.HandleFunc("GET /live", func(w http.ResponseWriter, r *http.Request) {
+		if rejectStableHealth(w, r, revision, directHost) {
+			return
+		}
 		w.WriteHeader(http.StatusNoContent)
 	})
-	mux.HandleFunc("GET /ready", func(w http.ResponseWriter, _ *http.Request) {
+	mux.HandleFunc("GET /ready", func(w http.ResponseWriter, r *http.Request) {
+		if rejectStableHealth(w, r, revision, directHost) {
+			return
+		}
 		w.WriteHeader(http.StatusNoContent)
 	})
-	mux.HandleFunc("GET /verify", func(w http.ResponseWriter, _ *http.Request) {
+	mux.HandleFunc("GET /verify", func(w http.ResponseWriter, r *http.Request) {
+		if rejectStableHealth(w, r, revision, directHost) {
+			return
+		}
 		w.Header().Set("Cache-Control", "no-store")
 		w.Header().Set("Content-Type", "application/json")
 		_ = json.NewEncoder(w).Encode(map[string]string{"revision": revision})
@@ -62,4 +72,13 @@ func handler(revision string) http.Handler {
 		_, _ = w.Write([]byte("Provision HTTP example\n"))
 	})
 	return mux
+}
+
+func rejectStableHealth(w http.ResponseWriter, r *http.Request, revision, directHost string) bool {
+	if !strings.HasSuffix(revision, "-fail-stable") || r.Host == directHost {
+		return false
+	}
+	w.Header().Set("Cache-Control", "no-store")
+	http.Error(w, "deliberate post-switch health failure", http.StatusServiceUnavailable)
+	return true
 }
