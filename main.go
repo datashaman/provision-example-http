@@ -36,6 +36,7 @@ func handler(revision string) http.Handler {
 		w.WriteHeader(http.StatusNoContent)
 	})
 	mux.HandleFunc("GET /verify", func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Cache-Control", "no-store")
 		w.Header().Set("Content-Type", "application/json")
 		_ = json.NewEncoder(w).Encode(map[string]string{"revision": revision})
 	})
@@ -49,6 +50,7 @@ func handler(revision string) http.Handler {
 		defer timer.Stop()
 		select {
 		case <-timer.C:
+			w.Header().Set("Cache-Control", "no-store")
 			w.Header().Set("Content-Type", "application/json")
 			_ = json.NewEncoder(w).Encode(map[string]string{"revision": revision})
 		case <-r.Context().Done():
