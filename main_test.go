@@ -9,7 +9,7 @@ import (
 )
 
 func TestHealthAndRevisionEndpoints(t *testing.T) {
-	server := httptest.NewServer(handler("example-v1"))
+	server := httptest.NewServer(handler("example-v1", ""))
 	t.Cleanup(server.Close)
 
 	for _, path := range []string{"/live", "/ready"} {
@@ -41,7 +41,7 @@ func TestHealthAndRevisionEndpoints(t *testing.T) {
 }
 
 func TestSlowEndpointReportsTheRevisionThatAcceptedTheRequest(t *testing.T) {
-	server := httptest.NewServer(handler("example-v2"))
+	server := httptest.NewServer(handler("example-v2", ""))
 	t.Cleanup(server.Close)
 
 	started := time.Now()
@@ -66,7 +66,7 @@ func TestSlowEndpointReportsTheRevisionThatAcceptedTheRequest(t *testing.T) {
 }
 
 func TestSlowEndpointRejectsInvalidDurations(t *testing.T) {
-	server := httptest.NewServer(handler("example-v2"))
+	server := httptest.NewServer(handler("example-v2", ""))
 	t.Cleanup(server.Close)
 
 	for _, query := range []string{"", "0", "31", "nope"} {
@@ -77,6 +77,36 @@ func TestSlowEndpointRejectsInvalidDurations(t *testing.T) {
 		response.Body.Close()
 		if response.StatusCode != http.StatusBadRequest {
 			t.Fatalf("seconds=%q status = %d; want 400", query, response.StatusCode)
+		}
+	}
+}
+
+func TestFailStableRevisionPassesDirectChecksAndFailsProxiedChecks(t *testing.T) {
+	server := httptest.NewServer(handler("example-v3-fail-stable", "candidate.internal:28081"))
+	t.Cleanup(server.Close)
+
+	direct, err := http.NewRequest(http.MethodGet, server.URL+"/verify", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	direct.Host = "candidate.internal:28081"
+	response, err := http.DefaultClient.Do(direct)
+	if err != nil {
+		t.Fatal(err)
+	}
+	response.Body.Close()
+	if response.StatusCode != http.StatusOK {
+		t.Fatalf("direct verification status = %d; want 200", response.StatusCode)
+	}
+
+	for _, path := range []string{"/live", "/ready", "/verify"} {
+		response, err := http.Get(server.URL + path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		response.Body.Close()
+		if response.StatusCode != http.StatusServiceUnavailable {
+			t.Fatalf("proxied GET %s status = %d; want 503", path, response.StatusCode)
 		}
 	}
 }

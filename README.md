@@ -12,6 +12,8 @@ The application exposes:
 
 It listens on `PROVISION_HTTP_LISTEN`, defaulting to `127.0.0.1:18081`. Build a reproducible native Linux bundle with:
 
+For rollback acceptance tests, a `PROVISION_REVISION` ending in `-fail-stable` deliberately returns `503` from the three health endpoints when the request Host differs from the private `PROVISION_HTTP_LISTEN` address. Direct candidate verification therefore succeeds before a traffic switch, while verification through the stable proxy fails reproducibly. Other revisions retain the normal behavior.
+
 ```sh
 ./build.sh amd64
 ```
