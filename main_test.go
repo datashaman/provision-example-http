@@ -35,6 +35,9 @@ func TestHealthAndRevisionEndpoints(t *testing.T) {
 	if response.StatusCode != http.StatusOK || string(body) != "{\"revision\":\"example-v1\"}\n" {
 		t.Fatalf("verification response = %d %q", response.StatusCode, body)
 	}
+	if response.Header.Get("Cache-Control") != "no-store" {
+		t.Fatalf("verification Cache-Control = %q; want no-store", response.Header.Get("Cache-Control"))
+	}
 }
 
 func TestSlowEndpointReportsTheRevisionThatAcceptedTheRequest(t *testing.T) {
@@ -56,6 +59,9 @@ func TestSlowEndpointReportsTheRevisionThatAcceptedTheRequest(t *testing.T) {
 	}
 	if response.StatusCode != http.StatusOK || string(body) != "{\"revision\":\"example-v2\"}\n" {
 		t.Fatalf("slow response = %d %q", response.StatusCode, body)
+	}
+	if response.Header.Get("Cache-Control") != "no-store" {
+		t.Fatalf("slow response Cache-Control = %q; want no-store", response.Header.Get("Cache-Control"))
 	}
 }
 
